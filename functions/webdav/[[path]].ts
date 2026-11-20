@@ -10,6 +10,17 @@ import { handleRequestPut } from "./put";
 import { RequestHandlerParams } from "./utils";
 import { handleRequestPost } from "./post";
 
+// 👇 这是新增的 CORS 处理函数
+function withCORS(response: Response): Response {
+  const newResponse = new Response(response.body, response);
+  // 请确保下面的网址是你的 Cent 域名，千万不要带末尾的斜杠 /
+  newResponse.headers.set("Access-Control-Allow-Origin", "https://cent.112133.xyz"); 
+  newResponse.headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PROPFIND, MKCOL, COPY, MOVE");
+  newResponse.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, If-Match, If-None-Match, X-Requested-With, Destination, Overwrite");
+  newResponse.headers.set("Access-Control-Max-Age", "86400");
+  return newResponse;
+}
+
 async function handleRequestOptions() {
   return new Response(null, {
     headers: {
@@ -45,34 +56,42 @@ export const onRequest: PagesFunction<{
 }> = async function (context) {
   const env = context.env;
   const request: Request = context.request;
-  if (request.method === "OPTIONS") return handleRequestOptions();
+  
+  // 👇 用 withCORS 包裹 OPTIONS 响应
+  if (request.method === "OPTIONS") return withCORS(await handleRequestOptions());
 
   const skipAuth =
     env.WEBDAV_PUBLIC_READ === "1" &&
     ["GET", "HEAD", "PROPFIND"].includes(request.method);
 
   if (!skipAuth) {
+    // 👇 用 withCORS 包裹 403 响应
     if (!env.WEBDAV_USERNAME || !env.WEBDAV_PASSWORD)
-      return new Response("WebDAV protocol is not enabled", { status: 403 });
+      return withCORS(new Response("WebDAV protocol is not enabled", { status: 403 }));
 
     const auth = request.headers.get("Authorization");
+    // 👇 用 withCORS 包裹 401 响应
     if (!auth) {
-      return new Response("Unauthorized", {
+      return withCORS(new Response("Unauthorized", {
         status: 401,
         headers: { "WWW-Authenticate": `Basic realm="WebDAV"` },
-      });
+      }));
     }
     const expectedAuth = `Basic ${btoa(
       `${env.WEBDAV_USERNAME}:${env.WEBDAV_PASSWORD}`
     )}`;
+    // 👇 用 withCORS 包裹 401 响应
     if (auth !== expectedAuth)
-      return new Response("Unauthorized", { status: 401 });
+      return withCORS(new Response("Unauthorized", { status: 401 }));
   }
 
   const [bucket, path] = parseBucketPath(context);
-  if (!bucket) return notFound();
+  if (!bucket) return withCORS(notFound());
 
   const method: string = (context.request as Request).method;
   const handler = HANDLERS[method] ?? handleMethodNotAllowed;
-  return handler({ bucket, path, request: context.request });
+  
+  // 👇 最后，用 withCORS 包裹真正的文件操作响应
+  const finalResponse = await handler({ bucket, path, request: context.request });
+  return withCORS(finalResponse);
 };
