@@ -1,0 +1,4 @@
+/*
+  Access-Control-Allow-Origin: https://cent.112133.xyz
+  Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS, PROPFIND, PUT, DELETE, MKCOL, COPY, MOVE
+  Access-Control-Allow-Headers: Authorization, Content-Type, Depth, If-Match, If-None-Match, X-Requested-With, Destination, Overwrite
