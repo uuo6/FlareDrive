@@ -14,7 +14,7 @@ import { handleRequestPost } from "./post";
 function withCORS(response: Response): Response {
   const newResponse = new Response(response.body, response);
   // 请确保下面的网址是你的 Cent 域名，千万不要带末尾的斜杠 /
-  newResponse.headers.set("Access-Control-Allow-Origin", "https://cent.112133.xyz"); 
+  newResponse.headers.set("Access-Control-Allow-Origin", "https://cent.112133.xyz?method="); 
   newResponse.headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PROPFIND, MKCOL, COPY, MOVE");
   newResponse.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, If-Match, If-None-Match, X-Requested-With, Destination, Overwrite");
   newResponse.headers.set("Access-Control-Max-Age", "86400");
@@ -49,15 +49,18 @@ const HANDLERS: Record<
   DELETE: handleRequestDelete,
 };
 
-export const onRequest: PagesFunction<{
-  WEBDAV_USERNAME: string;
-  WEBDAV_PASSWORD: string;
-  WEBDAV_PUBLIC_READ?: string;
-}> = async function (context) {
+  export const onRequest: PagesFunction<...> = async function (context) {
   const env = context.env;
-  const request: Request = context.request;
+  let request: Request = context.request;
   
-  // 👇 用 withCORS 包裹 OPTIONS 响应
+  // 👇 新增：如果 URL 里有 method 参数，用它替换请求的真实方法
+  const url = new URL(request.url);
+  const realMethod = url.searchParams.get("method");
+  if (realMethod) {
+    request = new Request(request, { method: realMethod });
+  }
+
+  // 下面保持你原来的逻辑不变
   if (request.method === "OPTIONS") return withCORS(await handleRequestOptions());
 
   const skipAuth =
